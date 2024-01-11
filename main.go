@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 	"runtime"
-  "log"
-  "strings"
+    "log"
+    "strings"
 
 	"github.com/go-gl/gl/all-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
@@ -22,6 +22,12 @@ var (
     0.5, 0.5, 0, // left
     0.5, -0.5, 0, // right
   }
+
+
+  colors = [][]float32{
+      {0, 0, 1, 1},
+      {1, 0, 0, 1},
+  }
 )
 
 const (
@@ -37,11 +43,12 @@ const (
 
   fragmentShaderSource = `
       #version 410
-      layout(location = 0) out vec4 red_colour;
-      layout(location = 1) out vec4 blue_colour;
+
+      out vec4 fragColor;
+      uniform vec4 triangColor;
+
       void main() {
-          blue_colour = vec4(0, 0.2, 0.5, 1);
-          red_colour = vec4(1, 0, 0, 1);
+          fragColor = triangColor;
       }
   ` + "\x00"
 )
@@ -55,8 +62,8 @@ func main() {
   program := initOpenGL()
 
   var vaoList []uint32
-  vaoList = append(vaoList, makeVao(triangle, 0))
-  vaoList = append(vaoList, makeVao(triangle2, 1))
+  vaoList = append(vaoList, makeVao(triangle, 0, program))
+  vaoList = append(vaoList, makeVao(triangle2, 1, program))
   for !window.ShouldClose() {
     draw(vaoList, window, program)
   }
@@ -133,9 +140,7 @@ func draw(vaoList []uint32, window *glfw.Window, prog uint32) {
   gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
   gl.UseProgram(prog)
 
-  for index, vao := range vaoList {
-    ui8 := uint8(index)
-    gl.BindFragDataLocation(prog, uint32(index), &ui8)
+  for _, vao := range vaoList {
     gl.BindVertexArray(vao)
     gl.DrawArrays(gl.TRIANGLES, 0, int32(len(triangle) / 3))
   }
@@ -144,7 +149,7 @@ func draw(vaoList []uint32, window *glfw.Window, prog uint32) {
   window.SwapBuffers()
 }
 
-func makeVao(points []float32, index uint32) uint32 {
+func makeVao(points []float32, index uint32, program uint32) uint32 {
   var vbo uint32
   gl.GenBuffers(1, &vbo)
   gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
@@ -153,13 +158,15 @@ func makeVao(points []float32, index uint32) uint32 {
   var vao uint32
   gl.GenVertexArrays(1, &vao)
   gl.BindVertexArray(vao)
-  gl.EnableVertexAttribArray(index)
+  location := gl.GetUniformLocation(program, gl.Str("triangColor\x00"))
+  fmt.Println(colors[index][0])
+  gl.Uniform4fv(location, 1, &colors[index][0])
+  gl.EnableVertexAttribArray(0)
   gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
-  gl.VertexAttribPointer(index, 3, gl.FLOAT, false, 0, nil)
+  gl.VertexAttribPointer(0, 3, gl.FLOAT, false, 0, nil)
 
   return vao
 }
-
 
 func compileShader(source string, shaderType uint32) (uint32, error) {
     shader := gl.CreateShader(shaderType)
